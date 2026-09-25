@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>On My Way To You</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+/* ============================================================
+   EDIT ME — quick personalization guide
+   1. Search "HER NAME" / "YOUR NAME" in the HTML below and swap them.
+   2. Scroll to the JS "STATIONS" array near the bottom — write each
+      station's quote there (between the quotes marks). That's the
+      ONLY place you need to touch for the four station messages.
+   3. Edit the final letter text inside #letter-body.
+   4. TRAVEL_MS = how long the train takes to move between stations.
+      WAIT_MS = how long it waits at each station (currently 1 minute).
+      Both are set right above the STATIONS array.
+   ============================================================ */
+
+:root{
+  --night-deep:   #0a1428;
+  --night-mid:    #10213f;
+  --night-soft:   #1b3358;
+  --brass:        #d7a24a;
+  --brass-soft:   #f0cd8a;
+  --blush:        #e98a92;
+  --paper:        #f7ecd9;
+  --ink:          #1c1a15;
+  --mist:         rgba(247,236,217,0.72);
+}
+
+*{ box-sizing:border-box; }
+html, body{ height:100%; margin:0; overflow:hidden; }
+body{
+  background:var(--night-deep);
+  color:var(--paper);
+  font-family:'Quicksand', sans-serif;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; }
+}
+h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; letter-spacing:0.01em; }
+
+/* ---------- background sky (always on) ---------- */
+#sky{
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.05), transparent 40%),
+    linear-gradient(180deg, var(--night-deep) 0%, var(--night-mid) 55%, var(--night-soft) 100%);
+  pointer-events:none;
+}
+.star{ position:absolute; width:2px; height:2px; border-radius:50%; background:var(--paper); opacity:0.6; animation:twinkle 4s ease-in-out infinite; }
+@keyframes twinkle{ 0%,100%{ opacity:0.15; } 50%{ opacity:0.9; } }
+.moon{
+  position:fixed; top:7%; right:8%; width:64px; height:64px; border-radius:50%;
+  background:radial-gradient(circle at 35% 32%, #fff8e6, var(--brass-soft) 60%, var(--brass) 100%);
+  box-shadow:0 0 60px 12px rgba(240,205,138,0.35);
+  z-index:1; pointer-events:none;
+}
+
+/* ---------- panels (crossfade, no page scroll) ---------- */
+.panel{
+  position:fixed; inset:0; z-index:2;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:6vw;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.9s ease;
+}
+.panel.active{ opacity:1; pointer-events:auto; }
+
+.eyebrow{ font-size:0.78rem; letter-spacing:0.14em; color:var(--brass-soft); opacity:0.9; margin:0 0 16px; }
+.headline{ font-size:clamp(2.1rem, 6vw, 4rem); line-height:1.1; margin:0 0 18px; max-width:14ch; }
+.sub{ font-size:clamp(1rem, 2vw, 1.2rem); color:var(--mist); max-width:40ch; line-height:1.6; font-weight:400; }
+
+.btn{
+  margin-top:40px; padding:14px 34px; border-radius:999px; border:1px solid var(--brass);
+  background:transparent; color:var(--brass-soft); font-family:'Quicksand', sans-serif;
+  font-size:0.95rem; letter-spacing:0.05em; cursor:pointer;
+  transition:background 0.3s ease, color 0.3s ease;
+}
+.btn:hover{ background:var(--brass); color:var(--night-deep); }
+
+/* ---------- journey stage ---------- */
+#panel-journey{ padding:0; }
+#journey-stage{ position:absolute; inset:0; }
+
+#track{
+  position:absolute; left:4%; right:4%; bottom:22%; height:6px; z-index:2;
+  background:linear-gradient(90deg, transparent, rgba(215,162,74,0.5) 6%, rgba(215,162,74,0.5) 94%, transparent);
+}
+#track::after{
+  content:''; position:absolute; inset:0;
+  background-image:repeating-linear-gradient(90deg, rgba(247,236,217,0.35) 0 3px, transparent 3px 24px);
+}
+
+.station-marker{
+  position:absolute; bottom:22%; transform:translate(-50%, 50%);
+  display:flex; flex-direction:column; align-items:center; z-index:2;
+}
+.station-dot{
+  width:11px; height:11px; border-radius:50%; background:rgba(247,236,217,0.25);
+  border:1px solid rgba(215,162,74,0.5); transition:background 0.5s ease, box-shadow 0.5s ease;
+}
+.station-marker.reached .station-dot{ background:var(--brass); box-shadow:0 0 14px 3px rgba(215,162,74,0.6); }
+.station-label{
+  margin-top:10px; font-size:0.72rem; letter-spacing:0.06em; color:var(--mist); white-space:nowrap;
+}
+.station-marker.reached .station-label{ color:var(--brass-soft); }
+
+#train-wrap{
+  position:absolute; bottom:calc(22% + 3px); left:-10%; transform:translateX(-50%);
+  z-index:3; transition:left linear;
+}
+.smoke{ position:absolute; bottom:78px; left:18px; width:10px; height:10px; border-radius:50%; background:rgba(247,236,217,0.5); animation:puff 2.4s ease-out infinite; opacity:0; }
+.smoke:nth-child(2){ animation-delay:0.6s; } .smoke:nth-child(3){ animation-delay:1.2s; } .smoke:nth-child(4){ animation-delay:1.8s; }
+@keyframes puff{ 0%{ opacity:0.55; transform:translate(0,0) scale(0.6); } 100%{ opacity:0; transform:translate(-30px,-46px) scale(2.1); } }
+.wheel{ animation:spin 0.9s linear infinite; transform-origin:center; }
+@keyframes spin{ to{ transform:rotate(-360deg); } }
+#train-wrap.stopped .wheel, #train-wrap.stopped .smoke{ animation-play-state:paused; }
+#train-wrap.moving #train{ animation:chug 0.5s ease-in-out infinite; }
+@keyframes chug{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-2px); } }
+
+#quote-card{
+  position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) translateY(16px);
+  z-index:4; width:min(86vw, 480px);
+  background:rgba(10,20,40,0.55);
+  border:1px solid rgba(215,162,74,0.4);
+  backdrop-filter:blur(6px);
+  border-radius:10px;
+  padding:34px 30px;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.7s ease, transform 0.7s ease;
+}
+#quote-card.show{ opacity:1; transform:translate(-50%, -50%) translateY(0); pointer-events:auto; }
+.quote-station{ font-size:0.78rem; letter-spacing:0.14em; color:var(--brass); margin-bottom:14px; }
+.quote-text{ font-family:'Cormorant Garamond', serif; font-size:clamp(1.3rem, 3vw, 1.7rem); line-height:1.55; color:var(--paper); margin:0; }
+.quote-progress{ margin-top:22px; font-size:0.7rem; letter-spacing:0.08em; color:var(--mist); }
+.skip-link{
+  display:inline-block; margin-top:16px; font-size:0.72rem; color:var(--mist); opacity:0.55;
+  text-decoration:underline; cursor:pointer; letter-spacing:0.03em;
+}
+.skip-link:hover{ opacity:0.9; }
+
+/* final destination (Tenkasi) gets its own look, not just "another stop" */
+#quote-card.final{
+  border-color:var(--blush);
+  box-shadow:0 0 40px 4px rgba(233,138,146,0.18);
+  animation:finalGlow 2.4s ease-in-out infinite;
+}
+@keyframes finalGlow{
+  0%,100%{ box-shadow:0 0 30px 2px rgba(233,138,146,0.14); }
+  50%{ box-shadow:0 0 46px 6px rgba(233,138,146,0.3); }
+}
+#quote-card.final .quote-station{ color:var(--blush); }
+#quote-card.final .quote-progress{ color:var(--blush); opacity:0.85; }
+#quote-card.final .skip-link{ opacity:0.8; color:var(--blush); text-decoration:none; border-bottom:1px solid rgba(233,138,146,0.5); }
+
+/* ---------- arrival scene (getting off the train, finding the house) ---------- */
+#panel-arrival{ padding:0; }
+#arrival-stage{ position:absolute; inset:0; overflow:hidden; }
+
+#arrival-ground{
+  position:absolute; left:0; right:0; bottom:16%; height:2px;
+  background:linear-gradient(90deg, transparent, rgba(215,162,74,0.4) 10%, rgba(215,162,74,0.4) 90%, transparent);
+}
+
+#mini-train{ position:absolute; left:4%; bottom:calc(16% - 2px); width:76px; opacity:0.9; }
+
+#boy-figure{
+  position:absolute; left:15%; bottom:16%; width:40px; height:96px;
+  transition:left 3.4s cubic-bezier(.45,.05,.55,.95);
+}
+#boy-figure svg, #girl-standalone svg{ display:block; width:100%; height:100%; }
+#boy-figure.idle{ animation:idleSway 1.6s ease-in-out infinite; }
+@keyframes idleSway{ 0%,100%{ transform:rotate(0deg); } 50%{ transform:rotate(2deg); } }
+#boy-figure.walking{ animation:walkBob 0.5s ease-in-out infinite; }
+@keyframes walkBob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-3px); } }
+
+#house-wrap{ position:absolute; right:8%; bottom:16%; width:min(34vw, 210px); }
+#house-wrap svg{ display:block; width:100%; height:auto; overflow:visible; }
+
+#door-rect{ fill:#180f08; transition:fill 0.9s ease; }
+#arrival-stage.opened #door-rect{ fill:#f4d59a; }
+
+#girl-in-doorway{ opacity:0; transform:translateY(4px); transition:opacity 1s ease, transform 1s ease; transform-box:fill-box; transform-origin:50% 100%; }
+#arrival-stage.opened #girl-in-doorway{ opacity:1; transform:translateY(0); }
+
+#bell-group{ transform-box:fill-box; transform-origin:50% 0%; }
+#bell-group.ring{ animation:bellRing 0.35s ease-in-out 4; }
+@keyframes bellRing{ 0%,100%{ transform:rotate(0deg); } 25%{ transform:rotate(18deg); } 75%{ transform:rotate(-18deg); } }
+
+.lamp-glow{ animation:lampFlicker 2.6s ease-in-out infinite; }
+@keyframes lampFlicker{ 0%,100%{ opacity:0.9; } 50%{ opacity:0.6; } }
+
+/* ---------- finale ---------- */
+#panel-finale{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:70px 6vw 70px; justify-content:flex-start; }
+.hairline{ width:1px; height:60px; background:linear-gradient(var(--brass), transparent); margin:0 auto 24px; }
+
+.envelope-zone{ cursor:pointer; display:flex; flex-direction:column; align-items:center; }
+.envelope{ position:relative; width:230px; height:154px; background:var(--paper); border-radius:6px; box-shadow:0 20px 50px rgba(0,0,0,0.45); }
+.envelope::before{ content:''; position:absolute; inset:0; background:linear-gradient(135deg, rgba(0,0,0,0.06), transparent 50%); border-radius:6px; }
+.flap{ position:absolute; top:0; left:0; width:100%; height:100%; clip-path:polygon(0 0, 50% 55%, 100% 0); background:linear-gradient(135deg, var(--brass-soft), var(--brass)); transform-origin:top; transition:transform 0.7s cubic-bezier(.5,0,.2,1); border-radius:6px 6px 0 0; z-index:2; }
+.wax{ position:absolute; top:44%; left:50%; transform:translate(-50%,-50%); width:32px; height:32px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--blush), #b6444f 75%); box-shadow:0 3px 8px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:13px; z-index:3; }
+.envelope.open .flap{ transform:rotateX(180deg); }
+.envelope.open .wax{ opacity:0; transition:opacity 0.3s; }
+.envelope-hint{ margin-top:20px; font-size:0.88rem; color:var(--mist); letter-spacing:0.04em; }
+
+#letter{
+  max-width:500px; margin-top:40px; background:var(--paper); color:var(--ink); border-radius:4px;
+  padding:38px 34px 34px; box-shadow:0 30px 70px rgba(0,0,0,0.5);
+  opacity:0; transform:translateY(20px) scale(0.98); pointer-events:none;
+  transition:opacity 0.6s ease, transform 0.6s ease; text-align:left;
+}
+#letter.show{ opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+#letter h3{ font-size:1.8rem; margin:0 0 4px; color:#5a3b12; }
+#letter p{ font-family:'Cormorant Garamond', serif; font-size:1.15rem; line-height:1.72; margin:0 0 14px; }
+#letter .sign{ text-align:right; font-style:italic; margin-top:20px; }
+
+.cake-zone{ margin-top:54px; display:flex; flex-direction:column; align-items:center; }
+.cake-hint{ font-size:0.9rem; font-weight:700; color:var(--brass-soft); margin-top:14px; letter-spacing:0.04em; }
+#cake-svg{ cursor:pointer; }
+.candle-flame{ animation:flick 1.1s ease-in-out infinite; transform-origin:center bottom; }
+@keyframes flick{ 0%,100%{ transform:scale(1,1) rotate(0deg); } 50%{ transform:scale(0.9,1.08) rotate(-3deg); } }
+.blown .candle-flame{ opacity:0; }
+
+.confetti{ position:fixed; top:-10px; z-index:20; pointer-events:none; width:8px; height:14px; opacity:0.9; }
+
+@media (max-width:560px){
+  .envelope{ width:194px; height:128px; }
+  #letter{ padding:30px 22px 26px; }
+  #quote-card{ padding:26px 22px; }
+}
+</style>
+</head>
+<body>
+
+<div id="sky"></div>
+<div class="moon"></div>
+
+<!-- HERO -->
+<section class="panel active" id="panel-hero">
+  <p class="eyebrow">A JOURNEY, JUST FOR YOU</p>
+  <h1 class="headline">I'm on my way<br>to reach you</h1>
+  <p class="sub">Four stops between here and you. Sit back — the train leaves the moment you're ready.</p>
+  <button class="btn" id="start-btn">Begin the journey</button>
+</section>
+
+<!-- JOURNEY -->
+<section class="panel" id="panel-journey">
+  <div id="journey-stage">
+    <div id="track"></div>
+    <div id="stations-layer"></div>
+
+    <div id="train-wrap">
+      <svg id="train" width="220" height="90" viewBox="0 0 220 90" xmlns="http://www.w3.org/2000/svg">
+        <g>
+          <circle class="smoke" cx="0" cy="0" r="6"></circle>
+          <circle class="smoke" cx="0" cy="0" r="6"></circle>
+          <circle class="smoke" cx="0" cy="0" r="6"></circle>
+        </g>
+        <rect x="150" y="60" width="14" height="4" fill="#d7a24a" opacity="0.6"/>
+        <rect x="30" y="30" width="120" height="34" rx="6" fill="url(#bodyGrad)"/>
+        <rect x="18" y="14" width="40" height="50" rx="5" fill="#2c4066"/>
+        <rect x="24" y="20" width="12" height="12" rx="2" fill="#f0cd8a" opacity="0.9"/>
+        <rect x="34" y="0" width="10" height="16" rx="2" fill="#2c4066"/>
+        <rect x="70" y="38" width="14" height="12" rx="2" fill="#2c4066" opacity="0.85"/>
+        <rect x="95" y="38" width="14" height="12" rx="2" fill="#2c4066" opacity="0.85"/>
+        <rect x="120" y="38" width="14" height="12" rx="2" fill="#2c4066" opacity="0.85"/>
+        <rect x="20" y="62" width="132" height="8" rx="2" fill="#1c1a15"/>
+        <g class="wheel"><circle cx="45" cy="76" r="12" fill="#1c1a15"/><circle cx="45" cy="76" r="4" fill="#d7a24a"/></g>
+        <g class="wheel"><circle cx="85" cy="76" r="12" fill="#1c1a15"/><circle cx="85" cy="76" r="4" fill="#d7a24a"/></g>
+        <g class="wheel"><circle cx="125" cy="76" r="12" fill="#1c1a15"/><circle cx="125" cy="76" r="4" fill="#d7a24a"/></g>
+        <defs>
+          <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f0cd8a"/><stop offset="1" stop-color="#c98f3f"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <div id="quote-card">
+      <p class="quote-station" id="quote-station"></p>
+      <p class="quote-text" id="quote-text"></p>
+      <p class="quote-progress" id="quote-progress"></p>
+      <span class="skip-link" id="skip-link">continue now</span>
+    </div>
+  </div>
+</section>
+
+<!-- ARRIVAL -->
+<section class="panel" id="panel-arrival">
+  <div id="arrival-stage">
+    <div id="arrival-ground"></div>
+
+    <svg id="mini-train" viewBox="0 0 110 46" xmlns="http://www.w3.org/2000/svg">
+      <rect x="14" y="14" width="64" height="20" rx="4" fill="#c98f3f"/>
+      <rect x="4" y="4" width="24" height="30" rx="3" fill="#2c4066"/>
+      <rect x="34" y="20" width="8" height="8" rx="1" fill="#2c4066" opacity="0.85"/>
+      <rect x="50" y="20" width="8" height="8" rx="1" fill="#2c4066" opacity="0.85"/>
+      <rect x="66" y="20" width="8" height="8" rx="1" fill="#2c4066" opacity="0.85"/>
+      <circle cx="22" cy="40" r="6" fill="#1c1a15"/>
+      <circle cx="50" cy="40" r="6" fill="#1c1a15"/>
+      <circle cx="70" cy="40" r="6" fill="#1c1a15"/>
+    </svg>
+
+    <div id="boy-figure" class="idle">
+      <svg viewBox="0 0 40 100" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="18" r="13" fill="#0a0f1c"/>
+        <rect x="6" y="30" width="28" height="42" rx="9" fill="#0a0f1c"/>
+        <rect x="5" y="28" width="30" height="6" rx="3" fill="#d7a24a"/>
+        <rect x="9" y="70" width="7" height="27" rx="3" fill="#0a0f1c"/>
+        <rect x="24" y="70" width="7" height="27" rx="3" fill="#0a0f1c"/>
+      </svg>
+    </div>
+
+    <div id="house-wrap">
+      <svg viewBox="0 0 220 230" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,95 110,30 210,95" fill="#1b3358"/>
+        <rect x="24" y="90" width="172" height="122" fill="#233c60"/>
+        <rect x="46" y="112" width="34" height="34" rx="2" fill="#f0cd8a"/>
+        <rect x="140" y="112" width="34" height="34" rx="2" fill="#f0cd8a"/>
+        <circle cx="110" cy="66" r="16" fill="#f4d59a" opacity="0.35" class="lamp-glow"/>
+        <circle cx="110" cy="66" r="7" fill="#f4d59a" class="lamp-glow"/>
+        <rect x="88" y="150" width="44" height="62" rx="2" id="door-rect"/>
+        <g id="girl-in-doorway">
+          <circle cx="110" cy="168" r="9" fill="#0a0f1c"/>
+          <path d="M96,180 C96,192 124,192 124,180 L128,210 L92,210 Z" fill="#0a0f1c"/>
+          <polygon points="103,160 110,152 117,160" fill="#e98a92"/>
+        </g>
+        <g id="bell-group">
+          <circle cx="136" cy="158" r="4.5" fill="#d7a24a"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- FINALE -->
+<section class="panel" id="panel-finale">
+  <div class="hairline"></div>
+  <p class="eyebrow">YOU'VE ARRIVED</p>
+  <h2 class="headline" style="max-width:16ch;">Happy Birthday, <span id="her-name">HER NAME</span></h2>
+
+  <div class="envelope-zone" id="envelope-zone">
+    <div class="envelope" id="envelope">
+      <div class="wax">♥</div>
+      <div class="flap"></div>
+    </div>
+    <p class="envelope-hint" id="envelope-hint">tap the envelope to open it</p>
+  </div>
+
+  <div id="letter">
+    <h3>My dearest,</h3>
+    <p id="letter-body">
+      Happy birthday. I know I'm not there to hand you this in person, but I wanted you to know that even from this
+      far away, you're the reason I'd get on any train, any night, in any weather. Thank you for being patient with
+      the distance, for still laughing at my late-night calls, and for being exactly the kind of person worth
+      chasing across every mile. I hope this year brings you everything you deserve — and a little more.
+    </p>
+    <p>I love you more than I know how to say. Happy birthday, love.</p>
+    <p class="sign">— YOUR NAME</p>
+  </div>
+
+  <div class="cake-zone">
+    <svg id="cake-svg" width="170" height="140" viewBox="0 0 170 140" xmlns="http://www.w3.org/2000/svg">
+      <g class="candle-flame">
+        <ellipse cx="85" cy="18" rx="6" ry="10" fill="#f6b93b"/>
+        <ellipse cx="85" cy="20" rx="3" ry="6" fill="#fff3d6"/>
+      </g>
+      <rect x="80" y="26" width="10" height="20" fill="#f7ecd9"/>
+      <rect x="30" y="46" width="110" height="34" rx="6" fill="url(#icingGrad)"/>
+      <rect x="20" y="78" width="130" height="46" rx="8" fill="url(#cakeGrad)"/>
+      <circle cx="55" cy="64" r="4" fill="#f7ecd9"/>
+      <circle cx="85" cy="60" r="4" fill="#f7ecd9"/>
+      <circle cx="115" cy="64" r="4" fill="#f7ecd9"/>
+      <defs>
+        <linearGradient id="icingGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2a7ad"/><stop offset="1" stop-color="#e07079"/></linearGradient>
+        <linearGradient id="cakeGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6c98c"/><stop offset="1" stop-color="#b9812f"/></linearGradient>
+      </defs>
+    </svg>
+    <p class="cake-hint" id="cake-hint">make a wish, then blow out the candle</p>
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- starfield ---------- */
+  var sky = document.getElementById('sky');
+  var starCount = window.innerWidth < 600 ? 60 : 120;
+  for (var i = 0; i < starCount; i++){
+    var s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = (Math.random()*100) + 'vw';
+    s.style.top = (Math.random()*100) + 'vh';
+    s.style.animationDelay = (Math.random()*4) + 's';
+    var size = Math.random() < 0.15 ? 3 : 2;
+    s.style.width = size + 'px'; s.style.height = size + 'px';
+    sky.appendChild(s);
+  }
+
+  /* ============================================================
+     TIMING — change these two numbers if you want a faster demo
+     while testing, then set WAIT_MS back to 60000 (1 minute) for
+     the real thing.
+     ============================================================ */
+  var TRAVEL_MS = 7000;   // time the train takes moving between stops
+  var WAIT_MS   = 30000;  // time it waits at each stop before moving on (30 seconds) — she can also just tap "continue now"
+
+  /* ============================================================
+     STATIONS — write your quotes here. "pos" is where along the
+     track (0–100) the stop sits; leave those as they are unless
+     you want to rearrange spacing.
+     ============================================================ */
+  var STATIONS = [
+    { name: "Ulunthurpet",  pos: 24, quote: "Write your Ulunthurpet quote here." },
+    { name: "Madurai",      pos: 49, quote: "Write your Madurai quote here." },
+    { name: "Rajapalayam",  pos: 74, quote: "Write your Rajapalayam quote here." },
+    { name: "Tenkasi",      pos: 92, quote: "Write your Tenkasi quote here.", final: true }
+  ];
+
+  var stage = document.getElementById('journey-stage');
+  var trainWrap = document.getElementById('train-wrap');
+  var quoteCard = document.getElementById('quote-card');
+  var quoteStation = document.getElementById('quote-station');
+  var quoteText = document.getElementById('quote-text');
+  var quoteProgress = document.getElementById('quote-progress');
+  var skipLink = document.getElementById('skip-link');
+  var stationsLayer = document.getElementById('stations-layer');
+
+  var panelHero = document.getElementById('panel-hero');
+  var panelJourney = document.getElementById('panel-journey');
+  var panelFinale = document.getElementById('panel-finale');
+
+  /* build station dots on the track */
+  var markers = STATIONS.map(function(st){
+    var el = document.createElement('div');
+    el.className = 'station-marker';
+    el.style.left = st.pos + '%';
+    el.innerHTML = '<div class="station-dot"></div><div class="station-label">' + st.name + '</div>';
+    stationsLayer.appendChild(el);
+    return el;
+  });
+
+  trainWrap.style.transitionDuration = TRAVEL_MS + 'ms';
+
+  var skipRequested = false;
+  skipLink.addEventListener('click', function(){ skipRequested = true; });
+
+  function showQuote(station, index){
+    quoteStation.textContent = station.final ? station.name + ' — journey\u2019s end' : station.name;
+    quoteText.textContent = station.quote;
+    quoteProgress.textContent = station.final ? 'you\u2019ve arrived' : ('stop ' + (index + 1) + ' of ' + STATIONS.length);
+    skipLink.textContent = station.final ? 'open your gift' : 'continue now';
+    quoteCard.classList.toggle('final', !!station.final);
+    quoteCard.classList.add('show');
+  }
+  function hideQuote(){ quoteCard.classList.remove('show'); quoteCard.classList.remove('final'); }
+
+  function waitThenContinue(cb){
+    skipRequested = false;
+    var elapsed = 0;
+    var tick = 250;
+    var timer = setInterval(function(){
+      elapsed += tick;
+      if (skipRequested || elapsed >= WAIT_MS){
+        clearInterval(timer);
+        cb();
+      }
+    }, tick);
+  }
+
+  function goToStation(i){
+    var station = STATIONS[i];
+    trainWrap.classList.add('moving');
+    trainWrap.classList.remove('stopped');
+    trainWrap.style.left = station.pos + '%';
+
+    setTimeout(function(){
+      trainWrap.classList.remove('moving');
+      trainWrap.classList.add('stopped');
+      markers[i].classList.add('reached');
+      showQuote(station, i);
+
+      waitThenContinue(function(){
+        hideQuote();
+        if (station.final){
+          setTimeout(function(){
+            panelJourney.classList.remove('active');
+            panelArrival.classList.add('active');
+            setTimeout(playArrivalScene, 500);
+          }, 500);
+        } else {
+          setTimeout(function(){ goToStation(i + 1); }, 400);
+        }
+      });
+    }, TRAVEL_MS);
+  }
+
+  /* ---------- arrival scene: off the train, to her door (silent — animation only) ---------- */
+  var panelArrival = document.getElementById('panel-arrival');
+  var arrivalStage = document.getElementById('arrival-stage');
+  var boyFigure = document.getElementById('boy-figure');
+  var houseWrap = document.getElementById('house-wrap');
+  var bellGroup = document.getElementById('bell-group');
+
+  function playArrivalScene(){
+    // a brief pause standing at the platform
+    setTimeout(function(){
+      // walk to the door
+      var stageRect = arrivalStage.getBoundingClientRect();
+      var houseRect = houseWrap.getBoundingClientRect();
+      var targetPx = (houseRect.left - stageRect.left) - 44;
+      boyFigure.classList.remove('idle');
+      boyFigure.classList.add('walking');
+      boyFigure.style.left = targetPx + 'px';
+
+      setTimeout(function(){
+        boyFigure.classList.remove('walking');
+
+        // ring the bell after a short beat
+        setTimeout(function(){
+          bellGroup.classList.add('ring');
+
+          setTimeout(function(){
+            bellGroup.classList.remove('ring');
+
+            // door opens after a suspense beat
+            setTimeout(function(){
+              arrivalStage.classList.add('opened');
+
+              // hold on the reveal, then move to the gift
+              setTimeout(function(){
+                panelArrival.classList.remove('active');
+                panelFinale.classList.add('active');
+              }, 2600);
+            }, 1600);
+          }, 1500);
+        }, 700);
+      }, 3600);
+    }, 1800);
+  }
+
+  document.getElementById('start-btn').addEventListener('click', function(){
+    panelHero.classList.remove('active');
+    panelJourney.classList.add('active');
+    setTimeout(function(){ goToStation(0); }, 600);
+  });
+
+  /* ---------- envelope open ---------- */
+  var envelope = document.getElementById('envelope');
+  var envelopeZone = document.getElementById('envelope-zone');
+  var envelopeHint = document.getElementById('envelope-hint');
+  var letter = document.getElementById('letter');
+  var opened = false;
+  envelopeZone.addEventListener('click', function(){
+    if (opened) return;
+    opened = true;
+    envelope.classList.add('open');
+    envelopeHint.textContent = 'from me to you';
+    setTimeout(function(){ letter.classList.add('show'); }, 350);
+  });
+
+  /* ---------- cake / candle blow + confetti ---------- */
+  var cakeSvg = document.getElementById('cake-svg');
+  var cakeHint = document.getElementById('cake-hint');
+  var blown = false;
+  cakeSvg.addEventListener('click', function(){
+    if (blown) return;
+    blown = true;
+    cakeSvg.classList.add('blown');
+    cakeHint.textContent = 'wish sent. happy birthday.';
+    launchConfetti();
+  });
+
+  function launchConfetti(){
+    var colors = ['#d7a24a', '#f0cd8a', '#e98a92', '#f7ecd9', '#8fb3d9'];
+    var count = window.innerWidth < 600 ? 50 : 90;
+    for (var i = 0; i < count; i++){
+      var el = document.createElement('div');
+      el.className = 'confetti';
+      el.style.left = (Math.random()*100) + 'vw';
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.borderRadius = Math.random() < 0.5 ? '50%' : '2px';
+      var duration = 2.6 + Math.random()*1.8;
+      var drift = (Math.random()*160 - 80);
+      var rotate = 360 + Math.random()*360;
+      el.animate([
+        { transform:'translate(0,0) rotate(0deg)', opacity:1 },
+        { transform:'translate('+drift+'px, 100vh) rotate('+rotate+'deg)', opacity:0.9 }
+      ], { duration: duration*1000, easing:'cubic-bezier(.2,.6,.3,1)' });
+      document.body.appendChild(el);
+      (function(node, dur){ setTimeout(function(){ node.remove(); }, dur*1000 + 100); })(el, duration);
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
