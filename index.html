@@ -120,7 +120,7 @@ h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; lett
 .smoke{ position:absolute; bottom:78px; left:18px; width:10px; height:10px; border-radius:50%; background:rgba(247,236,217,0.5); animation:puff 2.4s ease-out infinite; opacity:0; }
 .smoke:nth-child(2){ animation-delay:0.6s; } .smoke:nth-child(3){ animation-delay:1.2s; } .smoke:nth-child(4){ animation-delay:1.8s; }
 @keyframes puff{ 0%{ opacity:0.55; transform:translate(0,0) scale(0.6); } 100%{ opacity:0; transform:translate(-30px,-46px) scale(2.1); } }
-.wheel{ animation:spin 0.9s linear infinite; transform-origin:center; }
+.wheel{ animation:spin 0.9s linear infinite; transform-box:fill-box; transform-origin:center; }
 @keyframes spin{ to{ transform:rotate(-360deg); } }
 #train-wrap.stopped .wheel, #train-wrap.stopped .smoke{ animation-play-state:paused; }
 #train-wrap.moving #train{ animation:chug 0.5s ease-in-out infinite; }
@@ -423,7 +423,10 @@ h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; lett
     { name: "Ulunthurpet",  pos: 24, quote: "Write your Ulunthurpet quote here." },
     { name: "Madurai",      pos: 49, quote: "Write your Madurai quote here." },
     { name: "Rajapalayam",  pos: 74, quote: "Write your Rajapalayam quote here." },
-    { name: "Tenkasi",      pos: 92, quote: "Write your Tenkasi quote here.", final: true }
+    { name: "Tenkasi",      pos: 92, quote: "", final: true }
+    // Tenkasi is the final stop: no quote card is shown here anymore — the
+    // train arrives and he immediately starts walking home. The "quote"
+    // field above is unused now, left blank on purpose.
   ];
 
   var stage = document.getElementById('journey-stage');
@@ -487,19 +490,21 @@ h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; lett
       trainWrap.classList.remove('moving');
       trainWrap.classList.add('stopped');
       markers[i].classList.add('reached');
-      showQuote(station, i);
 
+      if (station.final){
+        // Tenkasi: no quote card, no gift prompt — he just gets off and starts walking home
+        setTimeout(function(){
+          panelJourney.classList.remove('active');
+          panelArrival.classList.add('active');
+          setTimeout(playArrivalScene, 500);
+        }, 800);
+        return;
+      }
+
+      showQuote(station, i);
       waitThenContinue(function(){
         hideQuote();
-        if (station.final){
-          setTimeout(function(){
-            panelJourney.classList.remove('active');
-            panelArrival.classList.add('active');
-            setTimeout(playArrivalScene, 500);
-          }, 500);
-        } else {
-          setTimeout(function(){ goToStation(i + 1); }, 400);
-        }
+        setTimeout(function(){ goToStation(i + 1); }, 400);
       });
     }, TRAVEL_MS);
   }
