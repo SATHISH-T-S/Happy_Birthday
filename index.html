@@ -252,6 +252,9 @@ h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; lett
 <div id="sky"></div>
 <div class="moon"></div>
 
+<!-- SONG (keep song.mp3 in the same folder as this file) -->
+<audio id="bg-song" src="song.mp3" loop preload="auto"></audio>
+
 <!-- HERO -->
 <section class="panel active" id="panel-hero">
   <p class="eyebrow">A JOURNEY, JUST FOR YOU</p>
@@ -568,7 +571,14 @@ h1,h2,h3, .serif{ font-family:'Cormorant Garamond', serif; font-weight:500; lett
     }, 1800);
   }
 
+  /* ---------- START BUTTON: plays the song + starts the journey ---------- */
   document.getElementById('start-btn').addEventListener('click', function(){
+    // start the song (allowed because it's triggered by a click)
+    var song = document.getElementById('bg-song');
+    song.volume = 0.8;
+    var p = song.play();
+    if (p && p.catch) p.catch(function(){});
+
     panelHero.classList.remove('active');
     panelJourney.classList.add('active');
     setTimeout(function(){ goToStation(0); }, 600);
